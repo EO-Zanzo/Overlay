@@ -1,0 +1,2 @@
+#include "Functions.h"
+ID_ICON ICON "Logo.ico"
