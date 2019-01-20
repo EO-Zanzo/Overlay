@@ -35,15 +35,14 @@
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="Functions.h" />
-    <ClInclude Include="Offsets.h" />
-    <ClInclude Include="Vector.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="Main.cpp" />
+    <ClInclude Include="Class.h" />
+    <ClInclude Include="Offset.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Resource.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Main.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />

@@ -1,1 +1,0 @@
-[![Build status](https://ci.appveyor.com/api/projects/status/github/xyz-1/overlay?svg=true)](https://ci.appveyor.com/project/xyz-1/overlay/build/artifacts)

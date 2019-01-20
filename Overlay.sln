@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.0.28307.102
+VisualStudioVersion = 15.0.28307.271
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Overlay", "Overlay.vcxproj", "{7FFD2426-6868-4029-AFB8-8FCBB2670A37}"
 EndProject
@@ -17,6 +17,6 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {7494C23A-A457-48E0-8FBC-BB119BFDE713}
+		SolutionGuid = {CA0C095B-A9A6-4895-B66A-49E98D232521}
 	EndGlobalSection
 EndGlobal

@@ -1,240 +1,201 @@
-#include "Functions.h"
+#include <Windows.h>
+#include "Class.h"
+#include "Offset.h"
 
-ID2D1Factory *pFactory;
-ID2D1HwndRenderTarget *pRenderTarget;
-ID2D1SolidColorBrush* pBrush;
-IDWriteTextFormat* pTextFormat;
-IDWriteFactory* pDWriteFactory;
-Process Read;
+bool Debug, Misc;
+float X, Y;
 
-int Render() {
-	pRenderTarget->BeginDraw();
-	pRenderTarget->Clear();
+int Draw(DWORD_PTR ULevel) {
+	auto AController = Read<DWORD_PTR>(UPlayer + PlayerController);
+	auto CameraManager = Read<DWORD_PTR>(AController + PlayerCameraManager);
+	auto APawn = Read<DWORD_PTR>(AController + Pawn);
+	auto ActorArray = Read<TArray>(ULevel + LevelArray);
 
-	tWnd = FindWindow(0, tName);
-	if (tWnd) {
-		GetWindowRect(tWnd, &tWindow);
-		MoveWindow(hWnd, tWindow.left, tWindow.top, tWindow.right - tWindow.left, tWindow.bottom - tWindow.top, true);
-		pRenderTarget->Resize(D2D1::SizeU(tWindow.right, tWindow.bottom));
+	for (int i = 0; i < ActorArray.Count; ++i) {
+		auto Actor = Read<DWORD_PTR>(ActorArray.Data + i * sizeof(DWORD_PTR));
 
-		if (!Init) {
-			ReadData();
-			Init = true;
+		if (!Actor)
+			continue;
+
+		if (Actor == APawn)
+			continue;
+
+		auto ObjectIndex = Read<DWORD>(Actor + ComparisonIndex);
+		auto ElementsPerChunk = 16 * 1024;
+		auto NamesIndex = Read<DWORD_PTR>(GNames + ObjectIndex / ElementsPerChunk * sizeof(DWORD_PTR));
+		auto NamesPointer = Read<DWORD_PTR>(NamesIndex + ObjectIndex % ElementsPerChunk * sizeof(DWORD_PTR));
+		string ActorName = Read<FNameEntry>(NamesPointer).AnsiName;
+
+		if (ActorName.find("BP_") == -1)
+			continue;
+
+		auto Name = ActorName;
+		auto Color = Common;
+
+		/* --------- Example list --------- */
+
+		// Debug
+		if (Debug) {
+		// Player
+		} else if (ActorName.find("PlayerPirate") != -1) {
+			auto PlayerInfo = Read<DWORD_PTR>(Actor + PlayerState);
+			auto PlayerIndex = Read<DWORD_PTR>(PlayerInfo + PlayerName);
+			wstring PlayerString = Read<FString>(PlayerIndex).WideName;
+			Name = string(PlayerString.begin(), PlayerString.end());
+			Color = Player;
+		// Ships
+		} else if (ActorName.find("ShipTemplate") != -1 || ActorName.find("ShipNetProxy") != -1) {
+			Name = "Ship";
+			Color = Ship;
+		// Shipwrecks
+		} else if (ActorName.find("Shipwreck_01_a_NetProxy") != -1) {
+			Name = "Shipwreck";
+			Color = Crate;
+		// Chests
+		} else if (ActorName.find("TreasureChest") != -1 && ActorName.find("ItemInfo") == -1) {
+			if (ActorName.find("Common") != -1) {
+				Name = "Castaways Chest";
+				Color = Common;
+				if (ActorName.find("DVR") != -1)
+					Name = "Ashen Castaways Chest";
+			} else if (ActorName.find("Rare") != -1) {
+				Name = "Seafarers Chest";
+				Color = Rare;
+				if (ActorName.find("DVR") != -1)
+					Name = "Ashen Seafarers Chest";
+			} else if (ActorName.find("Legendary") != -1) {
+				Name = "Marauders Chest";
+				Color = Legendary;
+				if (ActorName.find("DVR") != -1)
+					Name = "Ashen Marauders Chest";
+			} else if (ActorName.find("Mythical") != -1) {
+				Name = "Captains Chest";
+				Color = Mythical;
+				if (ActorName.find("DVR") != -1)
+					Name = "Ashen Captains Chest";
+			} else if (ActorName.find("PirateLegend") != -1) {
+				Name = "Chest of Legends";
+				Color = Mythical;
+				if (ActorName.find("DVR") != -1)
+					Name = "Ashen Chest of Legends";
+			} else if (ActorName.find("Drunken") != -1) {
+				Name = "Chest of Thousand Grogs";
+				Color = Mythical;
+			} else if (ActorName.find("Weeping") != -1) {
+				Name = "Chest of Sorrow";
+				Color = Mythical;
+			} else if (ActorName.find("Fort") != -1) {
+				Name = "Stronghold Chest";
+				Color = Mythical;
+			}
+		// Skeleton
+		} else if (ActorName.find("Skeleton") != -1 && ActorName.find("Pawn") != -1) {
+			Name = "Skeleton";
+			Color = Enemy;
+		// Skeleton Fort
+		} else if (ActorName.find("SkellyFort") != -1) {
+			Color = Cloud;
+			Name = "Skeleton Fort";
+		// Chickens
+		} else if (Misc && ActorName.find("BP_Chicken") != -1) {
+			if (ActorName.find("Common") != -1) {
+				Name = "White Chicken";
+				Color = Common;
+			} else if (ActorName.find("Rare") != -1) {
+				Name = "Red Speckled Chicken";
+				Color = Rare;
+			} else if (ActorName.find("Legendary") != -1) {
+				Name = "Black Plumed Chicken";
+				Color = Legendary;
+			} else if (ActorName.find("Mythical") != -1) {
+				Name = "Golden Chicken";
+				Color = Mythical;
+			}
+		// Pigs
+		} else if (Misc && ActorName.find("BP_Pig") != -1) {
+			if (ActorName.find("Common") != -1) {
+				Name = "Pink Pig";
+				Color = Common;
+			} else if (ActorName.find("Rare") != -1) {
+				Name = "Black Spotted Pig";
+				Color = Rare;
+			} else if (ActorName.find("Legendary") != -1) {
+				Name = "Black Coated Pig";
+				Color = Legendary;
+			} else if (ActorName.find("Mythical") != -1) {
+				Name = "Gold Striped Pig";
+				Color = Mythical;
+			}
+		// Snakes
+		} else if (Misc && ActorName.find("BP_Snake") != -1) {
+			if (ActorName.find("Common") != -1) {
+				Name = "Red Striped Snake";
+				Color = Common;
+			} else if (ActorName.find("Rare") != -1) {
+				Name = "Blue Dappled Snake";
+				Color = Rare;
+			} else if (ActorName.find("Legendary") != -1) {
+				Name = "Black Scaled Snake";
+				Color = Legendary;
+			} else if (ActorName.find("Mythical") != -1) {
+				Name = "Golden Snake";
+				Color = Mythical;
+			}
+		} else {
+			continue;
 		}
 
-		auto Names = Read.Memory<DWORD_PTR>(GNames);
-		auto World = Read.Memory<DWORD_PTR>(UWorld);
-		auto OwningGameInstance = Read.Memory<DWORD_PTR>(World + Offsets::OwningGameInstance);
-		auto LocalPlayers = Read.Memory<DWORD_PTR>(OwningGameInstance + Offsets::LocalPlayers);
-		auto ULocalPlayer = Read.Memory<DWORD_PTR>(LocalPlayers);
-		auto PlayerController = Read.Memory<DWORD_PTR>(ULocalPlayer + Offsets::PlayerController);
-		auto Pawn = Read.Memory<DWORD_PTR>(PlayerController + Offsets::Pawn);
-		auto CameraManager = Read.Memory<DWORD_PTR>(PlayerController + Offsets::PlayerCameraManager);
-		auto RootComponent = Read.Memory<DWORD_PTR>(Pawn + Offsets::RootComponent);
-		auto ULevel = Read.Memory<DWORD_PTR>(World + Offsets::PersistentLevel);
-		auto ActorCount = Read.Memory<DWORD>(ULevel + Offsets::ActorsTArrayCount);
+		/* ---------------------------------*/
 
-		for (DWORD i = 0; i < ActorCount; i++) {
-			auto ActorList = Read.Memory<DWORD_PTR>(ULevel + Offsets::ActorsTArray);
-			auto Actor = Read.Memory<DWORD_PTR>(ActorList + (i * 0x8));
+		auto ActorRootComponent = Read<DWORD_PTR>(Actor + RootComponent);
+		auto ActorComponent = Read<FTransform>(ActorRootComponent + ComponentToWorld);
+		auto PlayerCamera = Read<FMinimalViewInfo, DWORD_PTR>(CameraManager + CameraCache + POV);
 
-			if (!Actor)
-				continue;
+		auto Location = ActorComponent.Translation - PlayerCamera.Location;
+		Name += " [" + to_string((int)sqrtf(Location.Dot(Location)) / 100) + "m]";
+		wstring NameWide(Name.begin(), Name.end());
 
-			auto ActorID = Read.Memory<DWORD>(Actor + Offsets::Id);
-			auto ActorNamePTR = Read.Memory<DWORD_PTR>(Names + (ActorID / 0x4000) * 0x8);
-			auto ActorName = Read.Memory<DWORD_PTR>(ActorNamePTR + 0x8 * (ActorID % 0x4000));
-			auto ActorRootComponent = Read.Memory<DWORD_PTR>(Actor + Offsets::RootComponent);
-			auto ActorRelativeLocation = Read.Memory<Vector3>(ActorRootComponent + Offsets::RelativeLocation);
-			Name = Read.Memory<Text>(ActorName + 16).word;
+		auto Project = WorldToScreen(Location, PlayerCamera, X / 2, Y / 2);
+		RenderTarget->CreateSolidColorBrush(Color, &Brush);
+		RenderTarget->SetTransform(Matrix3x2F::Translation(Project.X, Project.Y));
+		RenderTarget->DrawText(NameWide.c_str(), (DWORD)NameWide.size(), TextFormat, RectF(X, Y, 0, 0), Brush);
+	}
 
-			if (Name.find("BP_") == -1)
-				continue;
+	return 0;
+}
 
-			Term = Name;
-			Type = Common;
+int Render() {
+	auto Target = FindWindow(0, GameName);
+	if (Target) {
+		GetWindowRect(Target, &Frame);
+		MoveWindow(Overlay, Frame.left, Frame.top, Frame.right - Frame.left, Frame.bottom - Frame.top, true);
+		RenderTarget->Resize(SizeU(Frame.right - Frame.left, Frame.bottom - Frame.top));
+		X = (float)Frame.right - Frame.left;
+		Y = (float)Frame.bottom - Frame.top;
+	}
 
-			// Debug
-			if (Debug) {
-			// Player
-			} else if (Name.find("BP_PlayerPirate_C") != -1) {
-				auto PlayerState = Read.Memory<DWORD_PTR>(Actor + Offsets::PlayerState);
-				auto PlayerNamePTR = Read.Memory<DWORD_PTR>(PlayerState + Offsets::PlayerName);
-				auto PlayerName = Read.Memory<TextX>(PlayerNamePTR);
-				wstring PlayerNameWide = PlayerName.word;
-				string PlayerString(PlayerNameWide.begin(), PlayerNameWide.end());
+	RenderTarget->BeginDraw();
+	RenderTarget->Clear();
 
-				Term = PlayerString;
-				Type = Player;
-			// Ships
-			} else if (Name.find("BP_SmallShipNetProxy") != -1 || Name.find("BP_MediumShipNetProxy") != -1 || Name.find("BP_LargeShipNetProxy") != -1) {
-				Term = "Ship";
-				Type = Ship;
-			} else if (Name.find("BP_SmallShipTemplate") != -1 || Name.find("BP_MediumShipTemplate") != -1 || Name.find("BP_LargeShipTemplate") != -1) {
-				Term = "Ship";
-				Type = Ship;
-			// Shipwrecks
-			} else if (Name.find("BP_Shipwreck_01_a_NetProxy") != -1) {
-				Term = "Shipwreck";
-				Type = Crate;
-			// Chests
-			} else if (Name.find("TreasureChest") != -1 && Name.find("ItemInfo") == -1) {
-				if (Name.find("Common") != -1) {
-					Term = "Castaways Chest";
-					Type = Common;
-					if (Name.find("DVR") != -1)
-						Term = "Ashen Castaways Chest";
-				} else if (Name.find("Rare") != -1) {
-					Term = "Seafarers Chest";
-					Type = Rare;
-					if (Name.find("DVR") != -1)
-						Term = "Ashen Seafarers Chest";
-				} else if (Name.find("Legendary") != -1) {
-					Term = "Marauders Chest";
-					Type = Legendary;
-					if (Name.find("DVR") != -1)
-						Term = "Ashen Marauders Chest";
-				} else if (Name.find("Mythical") != -1) {
-					Term = "Captains Chest";
-					Type = Mythical;
-					if (Name.find("DVR") != -1)
-						Term = "Ashen Captains Chest";
-				} else if (Name.find("PirateLegend") != -1) {
-					Term = "Chest of Legends";
-					Type = Mythical;
-					if (Name.find("DVR") != -1)
-						Term = "Ashen Chest of Legends";
-				} else if (Name.find("Drunken") != -1) {
-					Term = "Chest of Thousand Grogs";
-					Type = Mythical;
-				} else if (Name.find("Weeping") != -1) {
-					Term = "Chest of Sorrow";
-					Type = Mythical;
-				} else if (Name.find("Fort") != -1) {
-					Term = "Stronghold Chest";
-					Type = Mythical;
-				}
-			// Skulls
-			} else if (Name.find("BountyRewardSkull") != -1 && Name.find("ItemInfo") == -1) {
-				if (Name.find("Common") != -1) {
-					Name = "Foul Skull";
-					Type = Common;
-					if (Name.find("DVR") != -1)
-						Name = "Ashen Foul Skull";
-				} else if (Name.find("Rare") != -1) {
-					Name = "Disgraced Skull";
-					Type = Rare;
-					if (Name.find("DVR") != -1)
-						Name = "Ashen Disgraced Skull";
-				} else if (Name.find("Legendary") != -1) {
-					Name = "Hateful Skull";
-					Type = Legendary;
-					if (Name.find("DVR") != -1)
-						Name = "Ashen Hateful Skull";
-				} else if (Name.find("Mythical") != -1) {
-					Name = "Villainous Skull";
-					Type = Mythical;
-					if (Name.find("DVR") != -1)
-						Name = "Ashen Villainous Skull";
-				} else if (Name.find("Fort") != -1) {
-					Name = "Stronghold Skull";
-					Type = Mythical;
-				}
-			// Skeleton
-			} else if (Name.find("Skeleton") != -1 && Name.find("Pawn") != -1) {
-				Term = "Skeleton";
-				Type = Enemy;
-			// Skeleton Fort
-			} else if (Name.find("SkellyFort") != -1) {
-				Type = Cloud;
-				Term = "Skeleton Fort";
-			// Chickens
-			} else if (Misc && Name.find("BP_Chicken") != -1) {
-				if (Name.find("Common") != -1) {
-					Term = "White Chicken";
-					Type = Common;
-				} else if (Name.find("Rare") != -1) {
-					Term = "Red Speckled Chicken";
-					Type = Rare;
-				} else if (Name.find("Legendary") != -1) {
-					Term = "Black Plumed Chicken";
-					Type = Legendary;
-				} else if (Name.find("Mythical") != -1) {
-					Term = "Golden Chicken";
-					Type = Mythical;
-				}
-			// Pigs
-			} else if (Misc && Name.find("BP_Pig") != -1) {
-				if (Name.find("Common") != -1) {
-					Term = "Pink Pig";
-					Type = Common;
-				} else if (Name.find("Rare") != -1) {
-					Term = "Black Spotted Pig";
-					Type = Rare;
-				} else if (Name.find("Legendary") != -1) {
-					Term = "Black Coated Pig";
-					Type = Legendary;
-				} else if (Name.find("Mythical") != -1) {
-					Term = "Gold Striped Pig";
-					Type = Mythical;
-				}
-			// Snakes
-			} else if (Misc && Name.find("BP_Snake") != -1) {
-				if (Name.find("Common") != -1) {
-					Term = "Red Striped Snake";
-					Type = Common;
-				} else if (Name.find("Rare") != -1) {
-					Term = "Blue Dappled Snake";
-					Type = Rare;
-				} else if (Name.find("Legendary") != -1) {
-					Term = "Black Scaled Snake";
-					Type = Legendary;
-				} else if (Name.find("Mythical") != -1) {
-					Term = "Golden Snake";
-					Type = Mythical;
-				}
-			// Journal
-			} else if (Name.find("BP_LoreBook") != -1) {
-				Term = "Journal";
-				Type = Common;
-			// Rowboat
-			} else if (Name.find("BP_Rowboat_C") != -1) {
-				Term = "Rowboat";
-				Type = Common;
-			// Mermaid
-			} else if (Name.find("BP_Mermaid_C") != -1) {
-				Term = "Mermaid";
-				Type = Common;
-			// Shark
-			} else if (Name.find("BP_Shark_C") != -1) {
-				Term = "Shark";
-				Type = Enemy;
-			// Megalodon
-			} else if (Name.find("BP_TinyShark_C") != -1) {
-				Term = "Megalodon";
-				Type = Enemy;
-			} else {
-				continue;
-			}
+	if (!UEngine) {
+		Setup();
+	} else if (Read<DWORD_PTR>(UEngine + ViewportClient)) {
+		if (!UPlayer) {
+			UViewport = Read<DWORD_PTR>(UEngine + ViewportClient);
+			auto UGameInstance = Read<DWORD_PTR>(UViewport + GameInstance);
+			auto ULocalPlayer = Read<DWORD_PTR>(UGameInstance + LocalPlayers);
+			UPlayer = Read<DWORD_PTR>(ULocalPlayer);
+		}
 
-			auto RelativeLocation = Read.Memory<Vector3>(RootComponent + Offsets::RelativeLocation);
-			CameraRotation = Read.Memory<Vector3>(CameraManager + Offsets::CameraRotation);
-			CameraLocation = Read.Memory<Vector3>(CameraManager + Offsets::CameraLocation);
-			FOV = Read.Memory<float>(CameraManager + Offsets::FOV);
-
-			float Distance = Vector2(RelativeLocation.x, RelativeLocation.y).DistTo(Vector2(ActorRelativeLocation.x, ActorRelativeLocation.y)) / 100;
-			Term += " [" + std::to_string((int)Distance) + "m]";
-			wstring NameWide(Term.begin(), Term.end());
-
-			if (WorldToScreen(ActorRelativeLocation, &ScreenPoint, (float)hWindow.right, (float)hWindow.bottom)) {
-				pRenderTarget->CreateSolidColorBrush(Type, &pBrush);
-				pRenderTarget->SetTransform(D2D1::Matrix3x2F::Translation(ScreenPoint.x, ScreenPoint.y));
-				pRenderTarget->DrawText(NameWide.c_str(), (DWORD)NameWide.size(), pTextFormat, D2D1::RectF((float)hWindow.right, (float)hWindow.bottom, 0, 0), pBrush);
-			}
+		if (Read<DWORD_PTR>(UViewport + World)) {
+			auto UWorld = Read<DWORD_PTR>(UViewport + World);
+			auto ULevel = Read<DWORD_PTR>(UWorld + PersistentLevel);
+			Draw(ULevel);
 		}
 	}
 
-	pRenderTarget->EndDraw();
+	RenderTarget->EndDraw();
+	Sleep(5);
 
 	// F5 Misc
 	if (GetAsyncKeyState(VK_F5) & 1) {
@@ -259,11 +220,11 @@ int Render() {
 LRESULT CALLBACK WinProc(HWND Window, UINT Message, WPARAM wParam, LPARAM lParam) {
 	switch (Message) {
 		case WM_CREATE:
-			D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &pFactory);
-			GetClientRect(Window, &hWindow);
-			pFactory->CreateHwndRenderTarget(D2D1::RenderTargetProperties(), D2D1::HwndRenderTargetProperties(Window, D2D1::SizeU(hWindow.right, hWindow.bottom)), &pRenderTarget);
-			DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(pDWriteFactory), reinterpret_cast<IUnknown **>(&pDWriteFactory));
-			pDWriteFactory->CreateTextFormat(L"Arial", 0, DWRITE_FONT_WEIGHT_THIN, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 12, L"", &pTextFormat);
+			GetWindowRect(Window, &Frame);
+			D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &Factory);
+			Factory->CreateHwndRenderTarget(RenderTargetProperties(), HwndRenderTargetProperties(Window, SizeU(Frame.right - Frame.left, Frame.bottom - Frame.top)), &RenderTarget);
+			DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), (IUnknown**)&DWriteFactory);
+			DWriteFactory->CreateTextFormat(L"Tahoma", 0, DWRITE_FONT_WEIGHT_THIN, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 12, L"en-us", &TextFormat);
 			return 0;
 
 		case WM_PAINT:
@@ -277,16 +238,15 @@ LRESULT CALLBACK WinProc(HWND Window, UINT Message, WPARAM wParam, LPARAM lParam
 	return DefWindowProc(Window, Message, wParam, lParam);
 }
 
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, INT) {
+int WINAPI WinMain(HINSTANCE Instance, HINSTANCE, LPSTR, INT) {
 	MSG Message;
-	WNDCLASS wclass = {CS_HREDRAW | CS_VREDRAW, WinProc, 0, 0, hInstance, 0, LoadCursor(0, IDC_ARROW), 0, 0, hName};
+	WNDCLASS wclass = {CS_HREDRAW | CS_VREDRAW, WinProc, 0, 0, Instance, 0, LoadCursor(0, IDC_ARROW), 0, 0, ItemName};
 	RegisterClass(&wclass);
 
-	hWnd = CreateWindowEx(WS_EX_TOPMOST | WS_EX_LAYERED | WS_EX_TRANSPARENT, hName, hName, WS_OVERLAPPEDWINDOW | WS_VISIBLE, 0, 0, CW_USEDEFAULT, CW_USEDEFAULT, 0, 0, 0, 0);
-	SetLayeredWindowAttributes(hWnd, 0, 0, LWA_COLORKEY);
-	ShowWindow(hWnd, SW_SHOW);
+	Overlay = CreateWindowEx(WS_EX_TOPMOST | WS_EX_LAYERED | WS_EX_TRANSPARENT, ItemName, ItemName, WS_POPUP | WS_VISIBLE, 0, 0, 600, 400, 0, 0, 0, 0);
+	SetLayeredWindowAttributes(Overlay, 0, 0, LWA_COLORKEY);
 
-	while (GetMessage(&Message, hWnd, 0, 0)) {
+	while (GetMessage(&Message, Overlay, 0, 0)) {
 		TranslateMessage(&Message);
 		DispatchMessage(&Message);
 	}
