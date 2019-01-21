@@ -2,8 +2,9 @@
 #include "Class.h"
 #include "Offset.h"
 
+auto X = 800, Y = 600, B = 32;
+float SizeX, SizeY;
 bool Debug, Misc;
-float X, Y;
 
 int Draw(DWORD_PTR ULevel) {
 	auto AController = Read<DWORD_PTR>(UPlayer + PlayerController);
@@ -155,25 +156,28 @@ int Draw(DWORD_PTR ULevel) {
 		Name += " [" + to_string((int)sqrtf(Location.Dot(Location)) / 100) + "m]";
 		wstring NameWide(Name.begin(), Name.end());
 
-		auto Project = WorldToScreen(Location, PlayerCamera, X / 2, Y / 2);
+		auto Project = WorldToScreen(Location, PlayerCamera, SizeX, SizeY);
 		RenderTarget->CreateSolidColorBrush(Color, &Brush);
 		RenderTarget->SetTransform(Matrix3x2F::Translation(Project.X, Project.Y));
-		RenderTarget->DrawText(NameWide.c_str(), (DWORD)NameWide.size(), TextFormat, RectF(X, Y, 0, 0), Brush);
+		RenderTarget->DrawText(NameWide.c_str(), (DWORD)NameWide.size(), TextFormat, RectF((float)X, (float)Y, 0, 0), Brush);
 	}
 
 	return 0;
 }
 
-int Render() {
+int Render(HWND Window) {
 	auto Target = FindWindow(0, GameName);
 	if (Target) {
-		GetWindowRect(Target, &Frame);
-		MoveWindow(Overlay, Frame.left, Frame.top, Frame.right - Frame.left, Frame.bottom - Frame.top, true);
-		RenderTarget->Resize(SizeU(Frame.right - Frame.left, Frame.bottom - Frame.top));
-		X = (float)Frame.right - Frame.left;
-		Y = (float)Frame.bottom - Frame.top;
+		DwmGetWindowAttribute(Target, DWMWA_EXTENDED_FRAME_BOUNDS, &Frame, sizeof(Frame));
+		X = Frame.right - Frame.left;
+		Y = Frame.bottom - Frame.top - B;
+		MoveWindow(Window, Frame.left, Frame.top + B, X, Y, true);
+
+		SizeX = (float)X / 2;
+		SizeY = (float)Y / 2;
 	}
 
+	RenderTarget->Resize(SizeU(X, Y));
 	RenderTarget->BeginDraw();
 	RenderTarget->Clear();
 
@@ -189,10 +193,15 @@ int Render() {
 
 		if (Read<DWORD_PTR>(UViewport + World)) {
 			auto UWorld = Read<DWORD_PTR>(UViewport + World);
-			auto ULevel = Read<DWORD_PTR>(UWorld + PersistentLevel);
-			Draw(ULevel);
+			Draw(Read<DWORD_PTR>(UWorld + PersistentLevel));
 		}
 	}
+
+	// Crosshair
+	RenderTarget->CreateSolidColorBrush(Common, &Brush);
+	RenderTarget->SetTransform(Matrix3x2F::Identity());
+	RenderTarget->DrawLine(Point2F(SizeX, SizeY - 10), Point2F(SizeX, SizeY + 10), Brush);
+	RenderTarget->DrawLine(Point2F(SizeX - 10, SizeY), Point2F(SizeX + 10, SizeY), Brush);
 
 	RenderTarget->EndDraw();
 	Sleep(5);
@@ -220,15 +229,15 @@ int Render() {
 LRESULT CALLBACK WinProc(HWND Window, UINT Message, WPARAM wParam, LPARAM lParam) {
 	switch (Message) {
 		case WM_CREATE:
-			GetWindowRect(Window, &Frame);
 			D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &Factory);
-			Factory->CreateHwndRenderTarget(RenderTargetProperties(), HwndRenderTargetProperties(Window, SizeU(Frame.right - Frame.left, Frame.bottom - Frame.top)), &RenderTarget);
+			auto RenderProperties = RenderTargetProperties(D2D1_RENDER_TARGET_TYPE_DEFAULT, PixelFormat(DXGI_FORMAT_UNKNOWN, D2D1_ALPHA_MODE_PREMULTIPLIED));
+			Factory->CreateHwndRenderTarget(RenderProperties, HwndRenderTargetProperties(Window, SizeU(X, Y)), &RenderTarget);
 			DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), (IUnknown**)&DWriteFactory);
 			DWriteFactory->CreateTextFormat(L"Tahoma", 0, DWRITE_FONT_WEIGHT_THIN, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, 12, L"en-us", &TextFormat);
 			return 0;
 
 		case WM_PAINT:
-			Render();
+			Render(Window);
 			return 0;
 
 		case WM_DESTROY:
@@ -240,11 +249,13 @@ LRESULT CALLBACK WinProc(HWND Window, UINT Message, WPARAM wParam, LPARAM lParam
 
 int WINAPI WinMain(HINSTANCE Instance, HINSTANCE, LPSTR, INT) {
 	MSG Message;
+	MARGINS Margin = {-1};
 	WNDCLASS wclass = {CS_HREDRAW | CS_VREDRAW, WinProc, 0, 0, Instance, 0, LoadCursor(0, IDC_ARROW), 0, 0, ItemName};
 	RegisterClass(&wclass);
 
-	Overlay = CreateWindowEx(WS_EX_TOPMOST | WS_EX_LAYERED | WS_EX_TRANSPARENT, ItemName, ItemName, WS_POPUP | WS_VISIBLE, 0, 0, 600, 400, 0, 0, 0, 0);
-	SetLayeredWindowAttributes(Overlay, 0, 0, LWA_COLORKEY);
+	auto Overlay = CreateWindowEx(WS_EX_TRANSPARENT | WS_EX_LAYERED | WS_EX_TOPMOST, ItemName, ItemName, WS_POPUP | WS_VISIBLE, 0, 0, X, Y, 0, 0, 0, 0);
+	SetLayeredWindowAttributes(Overlay, 0, 255, LWA_ALPHA);
+	DwmExtendFrameIntoClientArea(Overlay, &Margin);
 
 	while (GetMessage(&Message, Overlay, 0, 0)) {
 		TranslateMessage(&Message);

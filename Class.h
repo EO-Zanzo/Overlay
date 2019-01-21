@@ -1,10 +1,12 @@
 #include <d2d1.h>
 #include <dwrite.h>
+#include <dwmapi.h>
 #include <string>
 #include <vector>
 #include <tlhelp32.h>
 #pragma comment(lib, "d2d1")
 #pragma comment(lib, "dwrite")
+#pragma comment(lib, "dwmapi")
 
 using namespace D2D1;
 using namespace std;
@@ -16,7 +18,6 @@ auto ItemName = "Overlay";
 DWORD_PTR GNames, UEngine, UViewport, UPlayer;
 HANDLE Process;
 RECT Frame;
-HWND Overlay;
 
 ID2D1Factory* Factory;
 ID2D1HwndRenderTarget* RenderTarget;
